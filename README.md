@@ -9,6 +9,7 @@ Live visualization of all the pokemon (with option to show gyms and pokestops) i
 
 ## Features:
 
+* TEST123
 * Shows Pokemon, Pokestops, and gyms with a clean GUI.
 * Notifications 
 * Lure information
