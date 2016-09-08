@@ -570,9 +570,6 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
             status['noitems'] = 0
             status['skip'] = 0
 
-            # only sleep when consecutive_fails reaches max_failures, overall fails for stat purposes
-            consecutive_fails = 0
-
             # Create the API instance this will use
             if args.mock != '':
                 api = FakePogoApi(args.mock)
@@ -589,7 +586,7 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
             while True:
 
                 # If this account has been messing up too hard, let it rest
-                if consecutive_fails >= args.max_failures:
+                if status['fail'] >= args.max_failures:
                     status['message'] = 'Account {} failed more than {} scans; possibly bad account. Switching accounts...'.format(account['username'], args.max_failures)
                     log.warning(status['message'])
                     account_failures.append({'account': account, 'last_fail_time': now(), 'reason': 'failures'})
@@ -654,7 +651,6 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                 # G'damnit, nothing back. Mark it up, sleep, carry on
                 if not response_dict:
                     status['fail'] += 1
-                    consecutive_fails += 1
                     status['message'] = 'Invalid response at {:6f},{:6f}, abandoning location'.format(step_location[0], step_location[1])
                     log.error(status['message'])
                     time.sleep(args.scan_delay)
@@ -665,37 +661,39 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                     parsed = parse_map(args, response_dict, step_location, dbq, whq)
                     search_items_queue.task_done()
                     status[('success' if parsed['count'] > 0 else 'noitems')] += 1
-                    consecutive_fails = 0
                     status['message'] = 'Search at {:6f},{:6f} completed with {} finds'.format(step_location[0], step_location[1], parsed['count'])
+                    status['fail'] = 0
                     log.debug(status['message'])
                 except KeyError:
                     parsed = False
                     status['fail'] += 1
-                    consecutive_fails += 1
                     status['message'] = 'Map parse failed at {:6f},{:6f}, abandoning location. {} may be banned.'.format(step_location[0], step_location[1], account['username'])
                     log.exception(status['message'])
 
                 if args.get_ivs and parsed:
                     # Get pokemon IVs
                     for pokemon in parsed['pokemons'].values():
-                        status['message'] = \
-                            'Getting IVs for encounter {}' \
-                            .format(b64decode(pokemon['encounter_id']))
-                        time.sleep(random.random() + 2)
-                        response = encounter_request(api, pokemon, args.jitter)
-                        if response['responses']['ENCOUNTER']['status'] != 1:
-                            log.warning('Pokemon encounter {} failed'.format(
-                                        b64decode(pokemon['encounter_id'])))
-                        else:
-                            encounter = response['responses']['ENCOUNTER']
-                            data = encounter['wild_pokemon']['pokemon_data']
-                            pokemon_ivs = {pokemon['encounter_id']: {
-                                'encounter_id': pokemon['encounter_id'],
-                                'iv_attack': data.get('individual_attack', 0),
-                                'iv_defense': data.get('individual_defense', 0),
-                                'iv_stamina': data.get('individual_stamina', 0)
-                            }}
-                            dbq.put((PokemonIVs, pokemon_ivs))
+                        if str(pokemon['pokemon_id']) in args.ivs_list:
+                            status['message'] = \
+                                'Getting IVs for encounter {}' \
+                                .format(b64decode(pokemon['encounter_id']))
+                            time.sleep(random.random() + 2)
+                            response = encounter_request(api, pokemon, args.jitter)
+                            if response['responses']['ENCOUNTER']['status'] != 1:
+                                log.warning('Pokemon encounter {} failed'.format(
+                                            b64decode(pokemon['encounter_id'])))
+                            else:
+                                encounter = response['responses']['ENCOUNTER']
+                                data = encounter['wild_pokemon']['pokemon_data']
+                                pokemon_ivs = {pokemon['encounter_id']: {
+                                    'encounter_id': pokemon['encounter_id'],
+                                    'iv_attack': data.get('individual_attack', 0),
+                                    'iv_defense': data.get('individual_defense', 0),
+                                    'iv_stamina': data.get('individual_stamina', 0),
+                                    'move_1': data['move_1'],
+                                    'move_2': data['move_2']
+                                }}
+                                dbq.put((PokemonIVs, pokemon_ivs))
 
                 # Get detailed information about gyms
                 if args.gym_info and parsed:

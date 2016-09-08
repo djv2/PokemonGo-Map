@@ -156,6 +156,8 @@ def get_args():
                         nargs='*', default=False, dest='webhooks')
     parser.add_argument('-iv', '--get-ivs', help='Get the IVs for every pokemon (causes an additional API hit for every pokemon)',
                         action='store_true', default=False)
+    parser.add_argument('-ivl', '--ivs-list', help='ID List of Pokemon',
+                        action='append', default=[])
     parser.add_argument('-gi', '--gym-info', help='Get all details about gyms (causes an additional API hit for every gym)',
                         action='store_true', default=False)
     parser.add_argument('--webhook-updates-only', help='Only send updates (pokémon & lured pokéstops)',
@@ -178,7 +180,6 @@ def get_args():
     parser.set_defaults(DEBUG=False)
 
     args = parser.parse_args()
-
     if args.only_server:
         if args.location is None:
             parser.print_usage()
