@@ -689,7 +689,9 @@ def search_worker_thread(args, account_queue, account_failures, search_items_que
                                     'encounter_id': pokemon['encounter_id'],
                                     'iv_attack': data.get('individual_attack', 0),
                                     'iv_defense': data.get('individual_defense', 0),
-                                    'iv_stamina': data.get('individual_stamina', 0)
+                                    'iv_stamina': data.get('individual_stamina', 0),
+                                    'move_1': data['move_1'],
+                                    'move_2': data['move_2']
                                 }}
                                 dbq.put((PokemonIVs, pokemon_ivs))
 
