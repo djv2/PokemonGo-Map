@@ -482,6 +482,7 @@ class MainWorker(BaseModel):
 
 class WorkerStatus(BaseModel):
     username = CharField(primary_key=True, max_length=50)
+    proxy = CharField()
     worker_name = CharField()
     success = IntegerField()
     fail = IntegerField()
@@ -1011,3 +1012,6 @@ def database_migrate(db, old_ver):
 
     if old_ver < 8:
         db.create_tables([PokemonIVs], safe=True)
+        migrate(
+            migrator.add_column('workerstatus', 'proxy', CharField(null=True, default=""))
+        )
